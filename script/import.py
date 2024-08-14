@@ -1,3 +1,4 @@
+import io
 import shlex
 import bpy
 import os
@@ -11,19 +12,23 @@ def message_box(message="", title="Message Box", icon='INFO'):
         self.layout.label(text=message)
     bpy.context.window_manager.popup_menu(draw, title=title, icon=icon)
 
-def parse(path=""): 
-    r = open(path, "r")
+def parse(path=""):
+
+    file_reader = open(path, "r")
+    data = file_reader.read()
+    r = io.StringIO(data)
+
     err = parse_definitions(r)
     if err:
         message_box(err, "Parsing Failed", 'ERROR')
         return
-    
+
 
 
 def parse_definitions(r=None) -> str:
     if r is None:
         return "reader is none"
-    
+
     for line in r:
         line = line.strip()
         if line == "":
@@ -166,31 +171,32 @@ def parse_property(r=None, property="", num_args=-1) -> Tuple[list[str], str]:
             continue
         records = shlex.split(line)
         if len(records) == 0:
-            return None, "%s: empty records (%s)" % (property, line)    
+            return None, "%s: empty records (%s)" % (property, line)
         if records[0] != property:
             return None, "%s: expected property %s got %s" % (property, property, records[0])
         if num_args != -1 and len(records)-1 != num_args:
             return None, "%s: expected %d arguments, got %d" % (property, num_args, len(records)-1)
-        
+
         return records, ""
-        
-    
+
+
 def parse_dmspritedef2(r=None) -> str:
     if r is None:
         return "reader is none"
-    
+
     records, err = parse_property(r, "TAG", 1)
     if err:
         return err
-    
+
     tag = records[1]
+    base_tag = tag.split("_DMSPRITEDEF")[0]
 
     mesh = bpy.data.meshes.new(tag)
-    
+
     records, err = parse_property(r, "CENTEROFFSET", 3)
     if err:
         return err
-    
+
     mesh["centeroffset"] = (float(records[1]), float(records[2]), float(records[3]))
 
     records, err = parse_property(r, "NUMVERTICES", 1)
@@ -225,7 +231,7 @@ def parse_dmspritedef2(r=None) -> str:
         if err:
             return err
         mesh_normals.append((float(records[1]), float(records[2]), float(records[3])))
-    
+
     records, err = parse_property(r, "NUMVERTEXCOLORS", 1)
     if err:
         return err
@@ -235,12 +241,12 @@ def parse_dmspritedef2(r=None) -> str:
         records, err = parse_property(r, "RGBA", 4)
         if err:
             return err
-        mesh_colors.append((float(records[1]), float(records[2]), float(records[3]), float(records[4])))
+        mesh_colors.append((float(records[1])/255, float(records[2])/255, float(records[3])/255, float(records[4])/255))
 
     records, err = parse_property(r, "SKINASSIGNMENTGROUPS", -1)
     if err:
         return err
-    
+
     records, err = parse_property(r, "MATERIALPALETTE", 1)
     if err:
         return err
@@ -249,7 +255,7 @@ def parse_dmspritedef2(r=None) -> str:
     records, err = parse_property(r, "POLYHEDRON", 0)
     if err:
         return err
-    
+
     records, err = parse_property(r, "DEFINITION", 1)
     if err:
         return err
@@ -258,7 +264,7 @@ def parse_dmspritedef2(r=None) -> str:
     records, err = parse_property(r, "ENDPOLYHEDRON", 0)
     if err:
         return err
-    
+
     records, err = parse_property(r, "NUMFACE2S", 1)
     if err:
         return err
@@ -273,10 +279,10 @@ def parse_dmspritedef2(r=None) -> str:
         records, err = parse_property(r, "PASSABLE", 1)
         if err:
             return err
-        mesh_passable.append(records[1])
+        mesh_passable.append(int(records[1]))
         records, err = parse_property(r, "TRIANGLE", 3)
         if err:
-            return err        
+            return err
         mesh_faces.append((int(records[1]), int(records[2]), int(records[3])))
         _, err = parse_property(r, "ENDDMFACE2", 0)
         if err:
@@ -293,7 +299,7 @@ def parse_dmspritedef2(r=None) -> str:
     for i in range(0, face_material_count*2, 2):
         mesh_face_materials.append(records[i+2])
         mesh_face_materials.append(records[i+3])
-        
+
     records, err = parse_property(r, "VERTEXMATERIALGROUPS", -1)
     if err:
         return err
@@ -305,7 +311,7 @@ def parse_dmspritedef2(r=None) -> str:
     for i in range(0, vertex_material_count*2,2):
         mesh_vertex_materials.append(records[i+2])
         mesh_vertex_materials.append(records[i+3])
-        
+
     records, err = parse_property(r, "BOUNDINGBOXMIN", 3)
     if err:
         return err
@@ -319,7 +325,7 @@ def parse_dmspritedef2(r=None) -> str:
     records, err = parse_property(r, "BOUNDINGRADIUS", 1)
     if err:
         return err
-    
+
     mesh["boundingradius"] = float(records[1])
 
     records, err = parse_property(r, "FPSCALE", 1)
@@ -360,33 +366,32 @@ def parse_dmspritedef2(r=None) -> str:
     #print(mesh_verts)
     mesh.from_pydata(mesh_verts, [], mesh_faces)
     mesh.update(calc_edges=True)
+    # mesh.use_auto_smooth = True
+    mesh.normals_split_custom_set_from_vertices(mesh_normals)
 
-    uvlayer = mesh.uv_layers.new(name="%s_uv" % tag)
+    uv_layer = mesh.uv_layers.new(name="%s_uv" % base_tag)
+    color_layer = mesh.vertex_colors.new(name="%s_color" % base_tag)
 
     for triangle in mesh.polygons:
         vertices = list(triangle.vertices)
         i = 0
-        for vertex in vertices:
-            uvlayer.data[triangle.loop_indices[i]].uv = (mesh_uvs[vertex]                                                         [0], mesh_uvs[vertex][1]-1)
+        for index in vertices:
+            uv_layer.data[triangle.loop_indices[i]].uv = (mesh_uvs[index][0], mesh_uvs[index][1]-1)
+            color_layer.data[triangle.loop_indices[i]].color = mesh_colors[index]
             i += 1
+
 
     # for i in range(len(mesh.polygons)):
     #     poly = mesh.polygons[i]
     #     if len(mesh_materials) > i:
     #         poly.material_index = mesh_materials[i]
-   
+
     faces = {}
-    mesh_obj = bpy.data.objects.new(tag.replace("_DMSPRITEDEF", ""), mesh)
+    mesh_obj = bpy.data.objects.new(base_tag, mesh)
 
     #collection = bpy.data.collections.new(tag)
     #collection.objects.link(mesh_obj)
     bpy.context.scene.collection.objects.link(mesh_obj)
-
-    # for i in range(len(mesh.polygons)):
-    #     poly = mesh.polygons[i]
-    #     #if len(mesh_materials) > i:
-    #     #    poly.material_index = mesh_materials[i]
-    #     poly["passable"] = mesh_passable[i]
 
     for face in faces:
         if face not in mesh_obj.face_maps:
@@ -395,8 +400,31 @@ def parse_dmspritedef2(r=None) -> str:
         face_map.add(faces[face])
 
     bm = bmesh.new()
-    bm.from_mesh(mesh)
+    if bpy.context.mode == 'EDIT_MESH':
+        bm.from_edit_mesh(mesh)
+    else:
+        bm.from_mesh(mesh)
 
+    bm.faces.ensure_lookup_table()
+    passable_layer = bm.faces.layers.int.new("passable")
+    for i in range(len(bm.faces)):
+        bm.faces[i][passable_layer] = mesh_passable[i]
+    # for i in range(len(mesh.polygons)):
+    #     poly = mesh.polygons[i]
+    #     # iterate every vertice in the polygon
+    #     for index in poly.vertices:
+    #         # get the vertex
+    #         vert = mesh.vertices[index]
+    #         vert["passable"] = mesh_passable[i]
+    #     #if len(mesh_materials) > i:
+    #     #    poly.material_index = mesh_materials[i]
+    #     poly["passable"] = mesh_passable[i]
+
+    if bpy.context.mode == 'EDIT_MESH':
+        bmesh.update_edit_mesh(mesh)
+    else:
+        bm.to_mesh(mesh)
+    bm.free()
     return ""
 
 
@@ -436,3 +464,4 @@ if ext != ".mod":
     exit
 
 parse(path)
+print("Read successful")
