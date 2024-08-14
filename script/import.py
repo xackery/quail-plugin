@@ -288,6 +288,7 @@ def parse_dmspritedef2(r=None) -> str:
     if len(records) < 2:
         return "FACEMATERIALGROUPS: expected at least 2 records"
     face_material_count = int(records[1])
+    mesh["facematerialgroups"] = " ".join(records[1:])
     mesh_face_materials = []
     for i in range(0, face_material_count*2, 2):
         mesh_face_materials.append(records[i+2])
@@ -298,6 +299,7 @@ def parse_dmspritedef2(r=None) -> str:
         return err
     if len(records) < 2:
         return "VERTEXMATERIALGROUPS: expected at least 2 records"
+    mesh["vertexmaterialgroups"] = " ".join(records[1:])
     vertex_material_count = int(records[1])
     mesh_vertex_materials = []
     for i in range(0, vertex_material_count*2,2):
@@ -380,15 +382,11 @@ def parse_dmspritedef2(r=None) -> str:
     #collection.objects.link(mesh_obj)
     bpy.context.scene.collection.objects.link(mesh_obj)
 
-    for i in range(len(mesh.polygons)):
-        poly = mesh.polygons[i]
-        #if len(mesh_materials) > i:
-        #    poly.material_index = mesh_materials[i]
-        new_map = "flag_%s" % mesh_passable[i]
-        if new_map not in faces:
-            faces[new_map] = []
-        face_map = faces[new_map]
-        face_map.append(i)
+    # for i in range(len(mesh.polygons)):
+    #     poly = mesh.polygons[i]
+    #     #if len(mesh_materials) > i:
+    #     #    poly.material_index = mesh_materials[i]
+    #     poly["passable"] = mesh_passable[i]
 
     for face in faces:
         if face not in mesh_obj.face_maps:
