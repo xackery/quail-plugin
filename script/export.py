@@ -5,7 +5,7 @@ import mathutils
 import bmesh
 from typing import Tuple
 
-path = "/src/quail/test/crushbone/r/r2.mod"
+path = "/src/quail/test/crushbone.quail/r/r2.mod"
 
 def message_box(message="", title="Message Box", icon='INFO'):
     def draw(self, context):
@@ -24,20 +24,22 @@ def write_definitions(w) -> str:
     for i in range(1, len(bpy.data.meshes)+2):
         name = "R%d" % i
         for object in bpy.data.objects:
-            if object.name == name:
-                err = write_dmspritedef2(w, object.data)
-                if err:
-                    return err
+            if object.name != name:
+                continue
+            err = write_dmspritedef2(w, object)
+            if err:
+                return err
 
 
-def write_dmspritedef2(w=None, mesh=None) -> str:
-    # type: (TextIOWrapper, bpy.types.Mesh) -> str
+def write_dmspritedef2(w=None, object=None) -> str:
+    # type: (TextIOWrapper, bpy.types.Object) -> str
     if w is None:
         return "writer is none"
+    if object is None:
+        return "object is none"
 
-    if mesh is None:
-        return "mesh is none"
-    # mesh = bpy.data.meshes[mesh_name]
+    mesh = object.data
+    center = object.location
 
     bm = bmesh.new()
     if bpy.context.mode == 'EDIT_MESH':
@@ -48,18 +50,20 @@ def write_dmspritedef2(w=None, mesh=None) -> str:
 
 
     w.write("DMSPRITEDEF2\n")
-    w.write("\tTAG \"%s\"\n" % mesh.name)
+    w.write("\tTAG \"%s_DMSPRITEDEF\"\n" % object.name)
 
-    center = mathutils.Vector((0.0, 0.0, 0.0))
-    for vertex in mesh.vertices:
-        center += vertex.co
-    center /= len(mesh.vertices)
+    # center = mathutils.Vector((0.0, 0.0, 0.0))
+    # for vertex in mesh.vertices:
+    #     center += vertex.co
+    # center /= len(mesh.vertices)
+
+
 
     w.write("\tCENTEROFFSET %0.8e %0.8e %0.8e\n" % (center[0], center[1], center[2]))
     w.write("\n")
     w.write("\tNUMVERTICES %d\n" % len(mesh.vertices))
     for vertex in mesh.vertices:
-        w.write("\tXYZ %0.8e %0.8e %0.8e\n" % (vertex.co.x-center[0], vertex.co.y-center[1], vertex.co.z-center[2]))
+        w.write("\tXYZ %0.8e %0.8e %0.8e\n" % (vertex.co.x, vertex.co.y, vertex.co.z))
     w.write("\n")
     w.write("\tNUMUVS %d\n" % len(mesh.vertices))
     for vertex in mesh.vertices:

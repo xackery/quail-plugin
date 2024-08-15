@@ -5,7 +5,7 @@ import os
 import bmesh
 from typing import Tuple
 
-path = "/src/quail/test/crushbone/r/r.mod"
+path = "/src/quail/test/crushbone.quail/r/r.original.mod"
 
 def message_box(message="", title="Message Box", icon='INFO'):
     def draw(self, context):
@@ -199,6 +199,8 @@ def parse_dmspritedef2(r=None) -> str:
 
     mesh["centeroffset"] = (float(records[1]), float(records[2]), float(records[3]))
 
+    if base_tag == "R1":
+        print(mesh["centeroffset"][0], mesh["centeroffset"][1], mesh["centeroffset"][2])
     records, err = parse_property(r, "NUMVERTICES", 1)
     if err:
         return err
@@ -208,7 +210,8 @@ def parse_dmspritedef2(r=None) -> str:
         records, err = parse_property(r, "XYZ", 3)
         if err:
             return err
-        mesh_verts.append((float(records[1])+mesh["centeroffset"][0], float(records[2])+mesh["centeroffset"][1], float(records[3])+mesh["centeroffset"][2]))
+        mesh_verts.append((float(records[1]), float(records[2]), float(records[3])))
+
 
     records, err = parse_property(r, "NUMUVS", 1)
     if err:
@@ -367,18 +370,23 @@ def parse_dmspritedef2(r=None) -> str:
     mesh.from_pydata(mesh_verts, [], mesh_faces)
     mesh.update(calc_edges=True)
     # mesh.use_auto_smooth = True
-    mesh.normals_split_custom_set_from_vertices(mesh_normals)
+
+    # mesh.normals_split_custom_set_from_vertices(mesh_normals)
 
     uv_layer = mesh.uv_layers.new(name="%s_uv" % base_tag)
     color_layer = mesh.vertex_colors.new(name="%s_color" % base_tag)
 
-    for triangle in mesh.polygons:
-        vertices = list(triangle.vertices)
-        i = 0
-        for index in vertices:
-            uv_layer.data[triangle.loop_indices[i]].uv = (mesh_uvs[index][0], mesh_uvs[index][1]-1)
-            color_layer.data[triangle.loop_indices[i]].color = mesh_colors[index]
-            i += 1
+    for i in range(vert_count):
+        uv_layer.data[i].uv = (mesh_uvs[i][0], mesh_uvs[i][1])
+        color_layer.data[i].color = mesh_colors[i]
+
+    # for triangle in mesh.polygons:
+    #     vertices = list(triangle.vertices)
+    #     i = 0
+    #     for index in vertices:
+    #         uv_layer.data[triangle.loop_indices[i]].uv = (mesh_uvs[index][0], mesh_uvs[index][1]-1)
+    #         color_layer.data[triangle.loop_indices[i]].color = mesh_colors[index]
+    #         i += 1
 
 
     # for i in range(len(mesh.polygons)):
@@ -388,6 +396,7 @@ def parse_dmspritedef2(r=None) -> str:
 
     faces = {}
     mesh_obj = bpy.data.objects.new(base_tag, mesh)
+    mesh_obj.location = mesh["centeroffset"]
 
     #collection = bpy.data.collections.new(tag)
     #collection.objects.link(mesh_obj)
