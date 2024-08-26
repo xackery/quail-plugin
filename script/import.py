@@ -5,29 +5,26 @@ import os
 import bmesh
 from typing import Tuple
 
-path = "/src/quail/test/crushbone.quail/r/r.original.mod"
+path = "/src/quail/test/arena.quail/r/r.original.mod"
 
-def message_box(message="", title="Message Box", icon='INFO'):
+def message_box(message:str, title:str, icon:str='INFO'):
     def draw(self, context):
         self.layout.label(text=message)
     bpy.context.window_manager.popup_menu(draw, title=title, icon=icon)
 
-def parse(path=""):
-
+def parse(path:str=""):
     file_reader = open(path, "r")
     data = file_reader.read()
     r = io.StringIO(data)
-
-    err = parse_definitions(r)
-    if err:
-        message_box(err, "Parsing Failed", 'ERROR')
-        return
-
+    try:
+        parse_definitions(r)
+    except Exception as e:
+        raise Exception(f"parse_definitions: {e}") from e
 
 
-def parse_definitions(r=None) -> str:
+def parse_definitions(r:io.TextIOWrapper=None):
     if r is None:
-        return "reader is none"
+        raise Exception("reader is none")
 
     for line in r:
         line = line.strip()
@@ -61,10 +58,10 @@ def parse_definitions(r=None) -> str:
         #         return err
         #     continue
         if line == "DMSPRITEDEF2":
-            err = parse_dmspritedef2(r)
-            if err:
-                return "dmspritedef2: "+ err
-            continue
+            try:
+                parse_dmspritedef2(r)
+            except Exception as e:
+                raise Exception(f"parse_dmspritedef2: {e}") from e
         # if line == "DMSPRITEDEFINITION":
         #     parse_dmspritedefinition(r)
         #     if err:
@@ -158,11 +155,11 @@ def parse_definitions(r=None) -> str:
         #return "Unknown definition: " + line
     return ""
 
-def parse_property(r=None, property="", num_args=-1) -> Tuple[list[str], str]:
+def parse_property(r:io.TextIOWrapper=None, property:str="", num_args:int=-1) -> list[str]:
     if r is None:
-        return None, "parse %s: reader is none" % property
+        raise Exception("reader is none")
     if property == "":
-        return "empty property"
+        raise Exception("empty property")
     for line in r:
         if line.find("//"):
             line = line.split("//")[0]
@@ -171,129 +168,87 @@ def parse_property(r=None, property="", num_args=-1) -> Tuple[list[str], str]:
             continue
         records = shlex.split(line)
         if len(records) == 0:
-            return None, "%s: empty records (%s)" % (property, line)
+            raise Exception("%s: empty records (%s)" % (property, line))
         if records[0] != property:
-            return None, "%s: expected property %s got %s" % (property, property, records[0])
+            raise Exception("%s: expected property %s got %s" % (property, property, records[0]))
         if num_args != -1 and len(records)-1 != num_args:
-            return None, "%s: expected %d arguments, got %d" % (property, num_args, len(records)-1)
+            raise Exception("%s: expected %d arguments, got %d" % (property, len(records)-1, num_args))
+        return records
 
-        return records, ""
-
-
-def parse_dmspritedef2(r=None) -> str:
+def parse_dmspritedef2(r:io.TextIOWrapper=None):
     if r is None:
-        return "reader is none"
+        raise Exception("reader is none")
 
-    records, err = parse_property(r, "TAG", 1)
-    if err:
-        return err
-
+    records = parse_property(r, "TAG", 1)
     tag = records[1]
     base_tag = tag.split("_DMSPRITEDEF")[0]
 
+    print("Reading %s" % tag)
     mesh = bpy.data.meshes.new(tag)
 
-    records, err = parse_property(r, "CENTEROFFSET", 3)
-    if err:
-        return err
-
+    records = parse_property(r, "CENTEROFFSET", 3)
     mesh["centeroffset"] = (float(records[1]), float(records[2]), float(records[3]))
 
     if base_tag == "R1":
         print(mesh["centeroffset"][0], mesh["centeroffset"][1], mesh["centeroffset"][2])
-    records, err = parse_property(r, "NUMVERTICES", 1)
-    if err:
-        return err
+    records = parse_property(r, "NUMVERTICES", 1)
     vert_count = int(records[1])
     mesh_verts = []
     for i in range(vert_count):
-        records, err = parse_property(r, "XYZ", 3)
-        if err:
-            return err
+        records = parse_property(r, "XYZ", 3)
         mesh_verts.append((float(records[1]), float(records[2]), float(records[3])))
 
 
-    records, err = parse_property(r, "NUMUVS", 1)
-    if err:
-        return err
+    records = parse_property(r, "NUMUVS", 1)
     uv_count = int(records[1])
     mesh_uvs = []
     for i in range(uv_count):
-        records, err = parse_property(r, "UV", 2)
-        if err:
-            return err
+        records = parse_property(r, "UV", 2)
         mesh_uvs.append((float(records[1]), float(records[2])))
 
-    records, err = parse_property(r, "NUMVERTEXNORMALS", 1)
-    if err:
-        return err
+    records = parse_property(r, "NUMVERTEXNORMALS", 1)
     normal_count = int(records[1])
     mesh_normals = []
     for i in range(normal_count):
-        records, err = parse_property(r, "XYZ", 3)
-        if err:
-            return err
+        records = parse_property(r, "XYZ", 3)
         mesh_normals.append((float(records[1]), float(records[2]), float(records[3])))
 
-    records, err = parse_property(r, "NUMVERTEXCOLORS", 1)
-    if err:
-        return err
+    records = parse_property(r, "NUMVERTEXCOLORS", 1)
     color_count = int(records[1])
     mesh_colors = []
     for i in range(color_count):
-        records, err = parse_property(r, "RGBA", 4)
-        if err:
-            return err
+        records = parse_property(r, "RGBA", 4)
         mesh_colors.append((float(records[1])/255, float(records[2])/255, float(records[3])/255, float(records[4])/255))
 
-    records, err = parse_property(r, "SKINASSIGNMENTGROUPS", -1)
-    if err:
-        return err
-
-    records, err = parse_property(r, "MATERIALPALETTE", 1)
-    if err:
-        return err
+    records = parse_property(r, "SKINASSIGNMENTGROUPS", -1)
+    records = parse_property(r, "MATERIALPALETTE", 1)
     mesh["materialpalette"] = records[1]
 
-    records, err = parse_property(r, "POLYHEDRON", 0)
-    if err:
-        return err
+    records = parse_property(r, "POLYHEDRON", 0)
 
-    records, err = parse_property(r, "DEFINITION", 1)
-    if err:
-        return err
+    records = parse_property(r, "DEFINITION", 1)
     mesh["definition"] = records[1]
 
-    records, err = parse_property(r, "ENDPOLYHEDRON", 0)
-    if err:
-        return err
+    print("definition %s" % mesh["definition"])
 
-    records, err = parse_property(r, "NUMFACE2S", 1)
-    if err:
-        return err
+    records = parse_property(r, "ENDPOLYHEDRON", 0)
+
+    records = parse_property(r, "NUMFACE2S", 1)
     face_count = int(records[1])
 
     mesh_faces = []
     mesh_passable = []
     for i in range(face_count):
-        records, err = parse_property(r, "DMFACE2", 0)
-        if err:
-            return err
-        records, err = parse_property(r, "PASSABLE", 1)
-        if err:
-            return err
+        records = parse_property(r, "DMFACE2", 0)
+        records = parse_property(r, "PASSABLE", 1)
         mesh_passable.append(int(records[1]))
-        records, err = parse_property(r, "TRIANGLE", 3)
-        if err:
-            return err
+        records = parse_property(r, "TRIANGLE", 3)
         mesh_faces.append((int(records[1]), int(records[2]), int(records[3])))
-        _, err = parse_property(r, "ENDDMFACE2", 0)
-        if err:
-            return err
+        parse_property(r, "ENDDMFACE2", 0)
 
-    records, err = parse_property(r, "FACEMATERIALGROUPS", -1)
-    if err:
-        return err
+    records = parse_property(r, "NUMMESHOPS", 1)
+
+    records = parse_property(r, "FACEMATERIALGROUPS", -1)
     if len(records) < 2:
         return "FACEMATERIALGROUPS: expected at least 2 records"
     face_material_count = int(records[1])
@@ -303,9 +258,7 @@ def parse_dmspritedef2(r=None) -> str:
         mesh_face_materials.append(records[i+2])
         mesh_face_materials.append(records[i+3])
 
-    records, err = parse_property(r, "VERTEXMATERIALGROUPS", -1)
-    if err:
-        return err
+    records = parse_property(r, "VERTEXMATERIALGROUPS", -1)
     if len(records) < 2:
         return "VERTEXMATERIALGROUPS: expected at least 2 records"
     mesh["vertexmaterialgroups"] = " ".join(records[1:])
@@ -315,63 +268,44 @@ def parse_dmspritedef2(r=None) -> str:
         mesh_vertex_materials.append(records[i+2])
         mesh_vertex_materials.append(records[i+3])
 
-    records, err = parse_property(r, "BOUNDINGBOXMIN", 3)
-    if err:
-        return err
+    records = parse_property(r, "BOUNDINGBOXMIN", 3)
     mesh["boundingboxmin"] = (float(records[1]), float(records[2]), float(records[3]))
 
-    records, err = parse_property(r, "BOUNDINGBOXMAX", 3)
-    if err:
-        return err
+    records = parse_property(r, "BOUNDINGBOXMAX", 3)
     mesh["boundingboxmax"] = (float(records[1]), float(records[2]), float(records[3]))
 
-    records, err = parse_property(r, "BOUNDINGRADIUS", 1)
-    if err:
-        return err
+    records = parse_property(r, "BOUNDINGRADIUS", 1)
 
     mesh["boundingradius"] = float(records[1])
 
-    records, err = parse_property(r, "FPSCALE", 1)
-    if err:
-        return err
+    records = parse_property(r, "FPSCALE", 1)
     mesh["fpscale"] = float(records[1])
 
-    records, err = parse_property(r, "HEXONEFLAG", 1)
-    if err:
-        return err
+    print("parse")
+    records = parse_property(r, "HEXONEFLAG", 1)
     mesh["hexoneflag"] = int(records[1])
 
-    records, err = parse_property(r, "HEXTWOFLAG", 1)
-    if err:
-        return err
+    records = parse_property(r, "HEXTWOFLAG", 1)
     mesh["hextwoflag"] = int(records[1])
 
-    records, err = parse_property(r, "HEXFOURTOUSANDFLAG", 1)
-    if err:
-        return err
+    records = parse_property(r, "HEXFOURTOUSANDFLAG", 1)
     mesh["hexfourthousandflag"] = int(records[1])
 
-    records, err = parse_property(r, "HEXEIGHTTOUSANDFLAG", 1)
-    if err:
-        return err
+    records = parse_property(r, "HEXEIGHTTOUSANDFLAG", 1)
     mesh["hexeightthousandflag"] = int(records[1])
 
-    records, err = parse_property(r, "HEXTENTHOUSANDFLAG", 1)
-    if err:
-        return err
+    records = parse_property(r, "HEXTENTHOUSANDFLAG", 1)
     mesh["hextenthousandflag"] = int(records[1])
 
-    records, err = parse_property(r, "HEXTWENTYTHOUSANDFLAG", 1)
-    if err:
-        return err
+    records = parse_property(r, "HEXTWENTYTHOUSANDFLAG", 1)
     mesh["hextwentythousandflag"] = int(records[1])
 
     #print(mesh_verts)
     mesh.from_pydata(mesh_verts, [], mesh_faces)
-    mesh.update(calc_edges=True)
-    # mesh.use_auto_smooth = True
-
-    # mesh.normals_split_custom_set_from_vertices(mesh_normals)
+    #mesh.update(calc_edges=True)
+    mesh.update()
+    #mesh.use_auto_smooth = True
+    #mesh.normals_split_custom_set_from_vertices(mesh_normals)
 
     uv_layer = mesh.uv_layers.new(name="%s_uv" % base_tag)
     color_layer = mesh.vertex_colors.new(name="%s_color" % base_tag)
@@ -428,12 +362,11 @@ def parse_dmspritedef2(r=None) -> str:
     #     #if len(mesh_materials) > i:
     #     #    poly.material_index = mesh_materials[i]
     #     poly["passable"] = mesh_passable[i]
-
-    if bpy.context.mode == 'EDIT_MESH':
-        bmesh.update_edit_mesh(mesh)
-    else:
-        bm.to_mesh(mesh)
+    print("end of layers?")
+    bm.to_mesh(mesh)
+    print("free")
     bm.free()
+    mesh_obj.data.update()
     return ""
 
 
