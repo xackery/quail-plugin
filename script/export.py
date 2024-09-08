@@ -5,49 +5,64 @@ import mathutils
 import bmesh
 from typing import Tuple
 
-path = "/src/quail/test/crushbone.quail/r/r2.mod"
+path = "/src/quail/test/arena.quail/r/r2.mod"
 
 def message_box(message="", title="Message Box", icon='INFO'):
     def draw(self, context):
         self.layout.label(text=message)
+    print("%s: %s" % (title, message))
     bpy.context.window_manager.popup_menu(draw, title=title, icon=icon)
 
 def write(path=""):
     w = open(path, "w")
-    err = write_definitions(w)
-    if err:
-        message_box(err, "Parsing Failed", 'ERROR')
-        return
+    try:
+        write_definitions(w)
+    except Exception as e:
+        raise Exception(f"write_definitions: {e}") from e
 
-def write_definitions(w) -> str:
-    # type: (TextIOWrapper) -> str
-    for i in range(1, len(bpy.data.meshes)+2):
+def write_definitions(w:TextIOWrapper):
+    for i in range(1, 4000):
         name = "R%d" % i
         for object in bpy.data.objects:
             if object.name != name:
                 continue
-            err = write_dmspritedef2(w, object)
-            if err:
-                return err
+            try:
+                write_dmspritedef2(w, object)
+            except Exception as e:
+                raise Exception(f"write_dmspritedef2 {name}: {e}") from e
 
 
-def write_dmspritedef2(w=None, object=None) -> str:
-    # type: (TextIOWrapper, bpy.types.Object) -> str
+def write_dmspritedef2(w:TextIOWrapper, object:bpy.types.Object):
     if w is None:
-        return "writer is none"
+        raise Exception("writer is none")
     if object is None:
-        return "object is none"
+        raise Exception("object is none")
 
     mesh = object.data
     center = object.location
 
     bm = bmesh.new()
     if bpy.context.mode == 'EDIT_MESH':
-        bm.from_edit_mesh(mesh)
-    else:
-        bm.from_mesh(mesh)
+        bpy.context.view_layer.objects.active = object
+    bm.from_mesh(mesh)
     bm.faces.ensure_lookup_table()
 
+    # for face in bm.faces:
+    #     if len(face.verts) != 3:
+    #         # change to edit mode
+    #         bpy.context.view_layer.objects.active = object
+    #         bpy.ops.object.mode_set(mode='EDIT')
+    #         bmesh.update_edit_mesh(mesh)
+    #         bpy.ops.mesh.select_all(action='DESELECT')
+    #         bpy.ops.mesh.select_mode(type="FACE")
+    #         bm = bmesh.from_edit_mesh(object.data)
+    #         bm.faces.ensure_lookup_table()
+    #         bpy.context.tool_settings.mesh_select_mode = (False, False, True)
+    #         bm.faces[face.index].select = True
+    #         #bmesh.update_edit_mesh(bpy.context.object.data)
+    #         raise Exception("face %d is not a triangle" % face.index)
+
+    bpy.ops.object.mode_set(mode='OBJECT')
 
     w.write("DMSPRITEDEF2\n")
     w.write("\tTAG \"%s_DMSPRITEDEF\"\n" % object.name)
@@ -57,8 +72,6 @@ def write_dmspritedef2(w=None, object=None) -> str:
     #     center += vertex.co
     # center /= len(mesh.vertices)
 
-
-
     w.write("\tCENTEROFFSET %0.8e %0.8e %0.8e\n" % (center[0], center[1], center[2]))
     w.write("\n")
     w.write("\tNUMVERTICES %d\n" % len(mesh.vertices))
@@ -67,6 +80,12 @@ def write_dmspritedef2(w=None, object=None) -> str:
     w.write("\n")
     w.write("\tNUMUVS %d\n" % len(mesh.vertices))
     for vertex in mesh.vertices:
+        if len(mesh.uv_layers) == 0:
+            w.write("\tUV 0.0 0.0\n")
+            continue
+        if len(mesh.uv_layers[0].data) == 0:
+            w.write("\tUV 0.0 0.0\n")
+            continue
         uv = mesh.uv_layers[0].data[vertex.index]
         w.write("\tUV %0.8e %0.8e\n" % (uv.uv.x, uv.uv.y))
     w.write("\n")
@@ -78,6 +97,9 @@ def write_dmspritedef2(w=None, object=None) -> str:
     color_layer = mesh.vertex_colors[0].data
     w.write("\tNUMVERTEXCOLORS %d\n" % len(mesh.vertices))
     for vertex in mesh.vertices:
+        if len(color_layer) <= vertex.index:
+            w.write("\tRGBA 255 255 255 255\n")
+            continue
         color = color_layer[vertex.index]
         r = int(color.color[0] * 255)
         g = int(color.color[1] * 255)
@@ -125,10 +147,14 @@ def write_dmspritedef2(w=None, object=None) -> str:
     w.write("ENDDMSPRITEDEF2\n\n")
 
     bm.free()
-    return ""
 
-err = write(path)
-if err:
-    message_box(err, "Writing Failed", 'ERROR')
-    exit
+try:
+    write(path)
+except Exception as e:
+    root_e = e
+    while root_e.__cause__:
+        root_e = root_e.__cause__
+    raise e
+#    message_box(f"Failed {root_e.__traceback__.tb_frame.f_code.co_filename}:{root_e.__traceback__.tb_lineno}: {e}", "Writing Failed", 'ERROR')
+#    exit
 print("Writing Successful")

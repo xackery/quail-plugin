@@ -3,6 +3,10 @@ VERSION ?= 2.2.1
 comma := ,
 COMMA_VERSION := $(subst .,${comma} ,${VERSION})
 
+.PHONY: test
+test:
+	@pytest --rootdir=. wce/wce_test.py
+
 build:
 	@echo "build: packing and building"
 	mkdir -p bin

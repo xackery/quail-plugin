@@ -27,16 +27,18 @@ class ExportQuail(Operator, ExportHelper):
     bl_idname = "export_quail.subdiv_data"
     bl_label = "Export EQG"
 
+    filepath = ""
+
     # ExportHelper mixin class uses this
     filename_ext = ".eqg"
 
-    is_triangulate: BoolProperty(
+    is_triangulate = BoolProperty(
         name="Triangulate",
         description="Triangulate Meshes",
         default=False,
     )
 
-    filter_glob: StringProperty(
+    filter_glob = StringProperty(
         default="*.eqg|*.s3d",
         options={'HIDDEN'},
         maxlen=255,  # Max internal buffer length, longer would be clamped.

@@ -1,0 +1,19 @@
+{
+    "files.trimTrailingWhitespace": true,
+    "python.testing.unittestArgs": [
+        "-v",
+        "-s",
+        ".",
+        "-p",
+        "*_test.py"
+    ],
+    "python.defaultInterpreterPath": "/usr/local/src/blender/4.2/python/bin/python3.11",
+    "python.testing.pytestEnabled": true,
+    "python.testing.unittestEnabled": false,
+    "python.testing.pytestArgs": [
+        "."
+    ],
+    "python.autoComplete.extraPaths": [
+        "${workspaceFolder}/.venv/lib/python3.11/site-packages"
+    ]
+}
