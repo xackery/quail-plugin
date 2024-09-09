@@ -8,23 +8,23 @@ import wce.parse as parse
 # 		FRAME 256 0 0 0 -16384 0 0 0
 # 	NUMLEGACYFRAMES 0
 
-class track_frame:
+class trackframe:
     xyz_scale:int
     xyz:tuple[int,int,int]
     rot_scale:int
     rot:tuple[int,int,int]
 
-class legacy_track_frame:
+class legacytrackframe:
     xyz_scale:int
     xyz:tuple[int,int,int]
     rot:tuple[int,int,int,int]
 
-class track_def:
+class trackdef:
     tag:str
     tag_index:int
     sprite:str
-    frames: list[track_frame]
-    legacy_frames:list[legacy_track_frame]
+    frames: list[trackframe]
+    legacy_frames:list[legacytrackframe]
 
     def __init__(self, tag:str, r:io.TextIOWrapper):
         self.tag = tag
@@ -36,7 +36,7 @@ class track_def:
         num_frames = int(records[1])
         self.frames = []
         for i in range(num_frames):
-            frame = track_frame()
+            frame = trackframe()
             records = parse.property(r, "FRAME", 8)
             frame.xyz_scale = int(records[1])
             frame.xyz = (int(records[2]), int(records[3]), int(records[4]))
@@ -47,7 +47,7 @@ class track_def:
         num_legacy_frames = int(records[1])
         self.legacy_frames = []
         for i in range(num_legacy_frames):
-            frame = legacy_track_frame()
+            frame = legacytrackframe()
             records = parse.property(r, "LEGACYFRAME", 7)
             frame.xyz_scale = int(records[1])
             frame.xyz = (int(records[2]), int(records[3]), int(records[4]))

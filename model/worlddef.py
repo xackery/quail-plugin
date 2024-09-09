@@ -6,7 +6,7 @@ import wce.parse as parse
 # 	ZONE 0
 # 	EQGVERSION? NULL
 
-class world_def:
+class worlddef:
     new_world:int
     zone:int
     eqg_version:tuple[int, None]
