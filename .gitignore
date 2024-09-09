@@ -133,3 +133,4 @@ quail-*
 blender.sh
 
 .DS_Store
+test/*
